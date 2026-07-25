@@ -1,4 +1,4 @@
-export async function main() {
+export async function run(canvas) {
   const adapter = await navigator.gpu?.requestAdapter();
   const device = await adapter?.requestDevice();
 
@@ -7,7 +7,8 @@ export async function main() {
     return;
   }
 
-  const canvas = document.querySelector("canvas");
+  resizeCanvas(canvas, device);
+
   const context = canvas.getContext("webgpu");
   const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
   context.configure({
@@ -31,7 +32,7 @@ export async function main() {
       }
 
       @fragment fn fs() -> @location(0) vec4f {
-        return vec4f(1.0, 1.0, 1.0, 1.0);
+        return vec4f(1.0, 1.0, 0.0, 1.0);
       }
     `,
   });
@@ -78,6 +79,26 @@ export async function main() {
   }
   render();
 
+}
+
+function resizeCanvas(canvas, device) {
+  const pixelRatio = window.devicePixelRatio || 1;
+  const limit = device.limits.maxTextureDimension2D;
+
+  const width = Math.min(
+    limit,
+    Math.max(1, Math.round(canvas.clientWidth * pixelRatio)),
+  );
+
+  const height = Math.min(
+    limit,
+    Math.max(1, Math.round(canvas.clientHeight * pixelRatio)),
+  );
+
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
 }
 
 function fail(msg) {

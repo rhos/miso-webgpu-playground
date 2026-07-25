@@ -1,16 +1,9 @@
 cabal-version:      3.0
-name:               app
+name:               webgpu-playground
 version:            0.1.0.0
-synopsis:           A miso-sampler application
-description:        Getting started miso application
-license:            BSD-3-Clause
-license-file:       LICENSE
-author:             dmjio
-maintainer:         code@dmj.io
-copyright:          haskell-miso @ 2025
+synopsis:           webgpu playground
 category:           Web
 build-type:         Simple
-extra-doc-files:    CHANGELOG.md
 
 flag interactive
   default:

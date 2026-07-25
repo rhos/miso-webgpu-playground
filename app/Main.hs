@@ -14,9 +14,8 @@ import qualified Miso.CSS as CSS
 import           Miso.CSS (StyleSheet)
 -----------------------------------------------------------------------------
 data Action
-  = NoAction
-  | InitializeWebGPU
-  deriving (Show, Eq)
+  = InitializeWebGPU DOMRef
+  deriving (Eq)
 -----------------------------------------------------------------------------
 #ifdef WASM
 #ifndef INTERACTIVE
@@ -39,13 +38,11 @@ app = (component () updateModel viewModel)
 
 updateModel :: Action -> Effect parent props () Action
 updateModel = \case
-  NoAction ->
-    io_ (consoleLog "Hello World!")
-  InitializeWebGPU ->
-    io_ I.initializeWebGPU
+  InitializeWebGPU canvas ->
+    io_ $ I.initializeWebGPU canvas
 
 -----------------------------------------------------------------------------
-viewModel :: props -> model -> View () Action
+viewModel :: props -> () -> View () Action
 viewModel _ _ = H.div_
   [ P.class_ "playground" ]
   [ H.h1_
@@ -60,7 +57,7 @@ viewModel _ _ = H.div_
     [ H.canvas_
       [ P.id_ "webgpu-canvas"
       , P.class_ "webgpu-canvas"
-      , E.onCreated InitializeWebGPU
+      , E.onCreatedWith InitializeWebGPU
       ]
       []
     ]
@@ -102,6 +99,11 @@ sheet =
     , CSS.backgroundColor (CSS.var "surface")
     , CSS.border "1px solid var(--border)"
     , CSS.borderRadius (CSS.rem 0.25)
+    ]
+  , CSS.selector_ ".webgpu-canvas"
+    [ CSS.display "block"
+    , CSS.width "100%"
+    , CSS.height "100%"
     ]
   ]
 -----------------------------------------------------------------------------

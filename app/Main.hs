@@ -5,14 +5,17 @@
 -----------------------------------------------------------------------------
 module Main where
 -----------------------------------------------------------------------------
+import qualified Interop as I
 import           Miso
 import           Miso.Html.Element as H
 import           Miso.Html.Property as P
+import qualified Miso.Event as E
 import qualified Miso.CSS as CSS
 import           Miso.CSS (StyleSheet)
 -----------------------------------------------------------------------------
 data Action
   = NoAction
+  | InitializeWebGPU
   deriving (Show, Eq)
 -----------------------------------------------------------------------------
 #ifdef WASM
@@ -33,10 +36,13 @@ app = (component () updateModel viewModel)
   { styles = [ Sheet sheet ]
   }
 -----------------------------------------------------------------------------
+
 updateModel :: Action -> Effect parent props () Action
 updateModel = \case
   NoAction ->
     io_ (consoleLog "Hello World!")
+  InitializeWebGPU ->
+    io_ I.initializeWebGPU
 
 -----------------------------------------------------------------------------
 viewModel :: props -> model -> View () Action
@@ -51,7 +57,13 @@ viewModel _ _ = H.div_
     [ P.id_ "webgpu-viewport"
     , P.class_ "webgpu-viewport"
     ]
-    []
+    [ H.canvas_
+      [ P.id_ "webgpu-canvas"
+      , P.class_ "webgpu-canvas"
+      , E.onCreated InitializeWebGPU
+      ]
+      []
+    ]
   ]
 -----------------------------------------------------------------------------
 sheet :: StyleSheet
@@ -89,7 +101,7 @@ sheet =
     , CSS.overflow "hidden"
     , CSS.backgroundColor (CSS.var "surface")
     , CSS.border "1px solid var(--border)"
-    , CSS.borderRadius (CSS.rem 0.75)
+    , CSS.borderRadius (CSS.rem 0.25)
     ]
   ]
 -----------------------------------------------------------------------------

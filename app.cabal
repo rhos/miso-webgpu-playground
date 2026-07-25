@@ -41,7 +41,9 @@ executable app
     options, warnings
   main-is:
     Main.hs
-  build-depends: 
+  other-modules:
+    Interop
+  build-depends:
     base < 5, miso >= 1.9
   hs-source-dirs:
     app

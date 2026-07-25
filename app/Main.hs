@@ -7,16 +7,12 @@ module Main where
 -----------------------------------------------------------------------------
 import           Miso
 import           Miso.Html.Element as H
-import           Miso.Html.Event as E
 import           Miso.Html.Property as P
-import           Miso.Lens
 import qualified Miso.CSS as CSS
 import           Miso.CSS (StyleSheet)
 -----------------------------------------------------------------------------
 data Action
-  = AddOne
-  | SubtractOne
-  | SayHelloWorld
+  = NoAction
   deriving (Show, Eq)
 -----------------------------------------------------------------------------
 #ifdef WASM
@@ -32,142 +28,68 @@ main = reload defaultEvents app
 main = startApp defaultEvents app
 #endif
 -----------------------------------------------------------------------------
-app :: App Int Action
-app = (component 0 updateModel viewModel)
+app :: App () Action
+app = (component () updateModel viewModel)
   { styles = [ Sheet sheet ]
   }
 -----------------------------------------------------------------------------
-updateModel :: Action -> Effect parent props Int Action
+updateModel :: Action -> Effect parent props () Action
 updateModel = \case
-  AddOne ->
-    this += 1
-  SubtractOne ->
-    this -= 1
-  SayHelloWorld ->
+  NoAction ->
     io_ (consoleLog "Hello World!")
+
 -----------------------------------------------------------------------------
-viewModel :: props -> Int -> View Int Action
-viewModel _ x = H.div_
-  [ P.class_ "counter-container" ]
+viewModel :: props -> model -> View () Action
+viewModel _ _ = H.div_
+  [ P.class_ "playground" ]
   [ H.h1_
-    [ P.class_ "counter-title"
+    [ P.class_ "playground-title"
     ]
-    [ "🍜 Miso sampler "
-    ]
-  , H.div_
-    [ P.class_ "counter-display"
-    ]
-    [ text (ms x)
+    [ "WebGPU playground"
     ]
   , H.div_
-    [ P.class_ "buttons-container"
+    [ P.id_ "webgpu-viewport"
+    , P.class_ "webgpu-viewport"
     ]
-    [ H.button_
-      [ E.onClick SubtractOne
-      , P.class_ "decrement-btn"
-      ] [text "-"]
-    , H.button_
-      [ E.onClick AddOne
-      , P.class_ "increment-btn"
-      ] [text "+"]
-    ]
+    []
   ]
 -----------------------------------------------------------------------------
 sheet :: StyleSheet
 sheet =
   CSS.sheet_
   [ CSS.selector_ ":root"
-    [ "--primary-color" =: "#4a6bff"
-    , "--primary-hover" =: "#3451d1"
-    , "--secondary-color" =: "#ff4a6b"
-    , "--secondary-hover" =: "#d13451"
-    , "--background" =: "#f7f9fc"
-    , "--text-color" =: "#333"
-    , "--shadow" =: "0 4px 10px rgba(0, 0, 0, 0.1);"
-    , "--transition" =: "all 0.3s ease;"
+    [ "--background" =: "#0f172a"
+    , "--surface" =: "#111827"
+    , "--border" =: "#334155"
+    , "--text-color" =: "#e2e8f0"
     ]
   , CSS.selector_ "body"
     [ CSS.fontFamily "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
-    , CSS.display "flex"
-    , CSS.justifyContent "center"
-    , CSS.alignItems "center"
-    , CSS.height "100vh"
     , CSS.margin "0"
     , CSS.backgroundColor (CSS.var "background")
     , CSS.color (CSS.var "text-color")
     ]
-  , CSS.selector_ ".counter-container"
-    [ CSS.backgroundColor CSS.white
-    , CSS.padding (CSS.rem 2)
-    , CSS.borderRadius (CSS.px 12)
-    , CSS.boxShadow "shadow"
-    , CSS.textAlign "center"
-    ]
-  , CSS.selector_ ".counter-display"
-    [ CSS.fontSize "5rem"
-    , CSS.fontWeight "bold"
-    , CSS.margin "1CSS.rem 0"
-    , CSS.transition "var(--transition)"
-    ]
-  , CSS.selector_ ".buttons-container"
-    [ CSS.display "flex"
-    , CSS.gap "1rem"
-    , CSS.justifyContent "center"
-    , CSS.marginTop "1.5rem"
-    ]
-  , CSS.selector_ "button"
-    [ CSS.fontSize "1.5rem"
-    , CSS.width "3rem"
-    , CSS.height "3rem"
-    , CSS.border "none"
-    , CSS.borderRadius "50%"
-    , CSS.cursor "pointer"
-    , CSS.transition "var(--transition)"
-    , CSS.color CSS.white
+  , CSS.selector_ ".playground"
+    [ CSS.boxSizing "border-box"
     , CSS.display "flex"
-    , CSS.alignItems "center"
-    , CSS.justifyContent "center"
+    , CSS.flexDirection "column"
+    , CSS.gap (CSS.rem 1)
+    , CSS.width "100vw"
+    , CSS.height "100vh"
+    , CSS.padding (CSS.rem 1.5)
     ]
-  , CSS.selector_ ".increment-btn"
-    [ CSS.backgroundColor (CSS.var "primary-color")
+  , CSS.selector_ ".playground-title"
+    [ CSS.fontSize (CSS.rem 1.25)
+    , CSS.margin "0"
     ]
-  , CSS.selector_ ".increment-btn:hover"
-    [ CSS.backgroundColor (CSS.var "primary-hover")
-    , CSS.transform "translateY(-2px)"
-    ]
-  , CSS.selector_ ".decrement-btn"
-    [ CSS.backgroundColor (CSS.var "secondary-color")
-    ]
-  , CSS.selector_ ".decrement-btn:hover"
-    [ CSS.backgroundColor (CSS.var "secondary-hover")
-    , CSS.transform "translateY(-2px)"
-    ]
-  , CSS.keyframes_ "pulse"
-    [ CSS.at (CSS.pct 0)
-      [ CSS.transform "scale(1)"
-      ]
-    , CSS.at (CSS.pct 50)
-      [ CSS.transform "scale(1.1)"
-      ]
-    , CSS.at (CSS.pct 100)
-      [ CSS.transform "scale(1)"
-      ]
-    ]
-  , CSS.selector_ ".counter-display.animate"
-    [ CSS.animation "pulse 0.3s ease"
-    ]
-  , CSS.media_ (CSS.maxWidth_ "480px")
-    [ CSS.rule_ ".counter-container"
-      [ CSS.padding (CSS.rem 1.5)
-      ]
-    , CSS.rule_ ".counter-display"
-      [ CSS.fontSize (CSS.rem 3)
-      ]
-    , CSS.rule_ "button"
-      [ CSS.fontSize (CSS.rem 1.2)
-      , CSS.width (CSS.rem 2.5)
-      , CSS.width (CSS.rem 2.5)
-      ]
+  , CSS.selector_ ".webgpu-viewport"
+    [ CSS.flex "1"
+    , CSS.minHeight "0"
+    , CSS.width "100%"
+    , CSS.overflow "hidden"
+    , CSS.backgroundColor (CSS.var "surface")
+    , CSS.border "1px solid var(--border)"
+    , CSS.borderRadius (CSS.rem 0.75)
     ]
   ]
 -----------------------------------------------------------------------------

@@ -1,21 +1,29 @@
-export async function run(canvas) {
+export async function initialize(canvas) {
+  // adapter is required only for device, most webgpu api goes through device
   const adapter = await navigator.gpu?.requestAdapter();
   const device = await adapter?.requestDevice();
 
   if (!device) {
-    fail("no webgpu support");
-    return;
+    throw new Error("WebGPU is not supported");
+  }
+
+  // context is the target to draw to - the webgpu pipeline is separated from the target
+  const context = canvas.getContext("webgpu");
+  if (!context) {
+    device.destroy();
+    throw new Error("Unable to create a WebGPU canvas context");
   }
 
   resizeCanvas(canvas, device);
 
-  const context = canvas.getContext("webgpu");
   const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
+  // we need to tell our target what will draw to it
   context.configure({
     device,
     format: presentationFormat
   });
 
+  // pipeline is device only
   const module = device.createShaderModule({
     label: "triangle shader module",
     code: /*wgsl */ `
@@ -32,7 +40,7 @@ export async function run(canvas) {
       }
 
       @fragment fn fs() -> @location(0) vec4f {
-        return vec4f(1.0, 1.0, 0.0, 1.0);
+        return vec4f(1.0, 0.0, 0.0, 1.0);
       }
     `,
   });
@@ -63,8 +71,13 @@ export async function run(canvas) {
     ],
   };
 
+  let destroyed = false;
 
   function render() {
+    if (destroyed) {
+      return;
+    }
+
     renderPassDescriptor.colorAttachments[0].view =
       context.getCurrentTexture().createView();
 
@@ -77,14 +90,26 @@ export async function run(canvas) {
     const commandBuffer = encoder.finish();
     device.queue.submit([commandBuffer]);
   }
-  render();
 
+  function destroy() {
+    if (destroyed) {
+      return;
+    }
+
+    destroyed = true;
+    context.unconfigure();
+    device.destroy();
+  }
+
+  return { render, destroy };
 }
 
 function resizeCanvas(canvas, device) {
+  // dpi
   const pixelRatio = window.devicePixelRatio || 1;
   const limit = device.limits.maxTextureDimension2D;
 
+  // canvas.client* are real sizes
   const width = Math.min(
     limit,
     Math.max(1, Math.round(canvas.clientWidth * pixelRatio)),
@@ -99,8 +124,4 @@ function resizeCanvas(canvas, device) {
     canvas.width = width;
     canvas.height = height;
   }
-}
-
-function fail(msg) {
-  alert(msg);
 }

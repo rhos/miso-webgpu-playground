@@ -10,11 +10,24 @@ import           Miso
 import           Miso.Html.Element as H
 import           Miso.Html.Property as P
 import qualified Miso.Event as E
+import qualified Miso.Html.Event as HE
 import qualified Miso.CSS as CSS
 import           Miso.CSS (StyleSheet)
 -----------------------------------------------------------------------------
+data Example
+  = Triangle
+  | Compute
+  deriving (Eq)
+-----------------------------------------------------------------------------
+newtype Model = Model
+  { selectedExample :: Example
+  }
+  deriving (Eq)
+-----------------------------------------------------------------------------
 data Action
-  = InitializeWebGPU DOMRef
+  = SelectExample Example
+  | InitializeWebGPU Example DOMRef
+  | DestroyWebGPU DOMRef
   deriving (Eq)
 -----------------------------------------------------------------------------
 #ifdef WASM
@@ -30,37 +43,85 @@ main = reload defaultEvents app
 main = startApp defaultEvents app
 #endif
 -----------------------------------------------------------------------------
-app :: App () Action
-app = (component () updateModel viewModel)
+app :: App Model Action
+app = (component initialModel updateModel viewModel)
   { styles = [ Sheet sheet ]
   }
 -----------------------------------------------------------------------------
+initialModel :: Model
+initialModel = Model
+  { selectedExample = Triangle
+  }
+-----------------------------------------------------------------------------
 
-updateModel :: Action -> Effect parent props () Action
+updateModel :: Action -> Effect parent props Model Action
 updateModel = \case
-  InitializeWebGPU canvas ->
-    io_ $ I.initializeWebGPU canvas
+  SelectExample example ->
+    modify $ \model -> model { selectedExample = example }
+  InitializeWebGPU example canvas ->
+    io_ $ I.initializeWebGPU (exampleId example) canvas
+  DestroyWebGPU canvas ->
+    io_ $ I.destroyWebGPU canvas
 
 -----------------------------------------------------------------------------
-viewModel :: props -> () -> View () Action
-viewModel _ _ = H.div_
+viewModel :: props -> Model -> View Model Action
+viewModel _ model = H.div_
   [ P.class_ "playground" ]
-  [ H.h1_
-    [ P.class_ "playground-title"
+  [ H.header_
+    [ P.class_ "playground-header"
     ]
-    [ "WebGPU playground"
+    [ H.h1_
+      [ P.class_ "playground-title"
+      ]
+      [ "WebGPU playground"
+      ]
+    , H.nav_
+      [ P.class_ "example-list"
+      ]
+      [ exampleButton (selectedExample model) example
+      | example <- examples
+      ]
     ]
   , H.div_
     [ P.id_ "webgpu-viewport"
     , P.class_ "webgpu-viewport"
     ]
     [ H.canvas_
-      [ P.id_ "webgpu-canvas"
+      [ key_ (exampleId (selectedExample model))
+      , P.id_ "webgpu-canvas"
       , P.class_ "webgpu-canvas"
-      , E.onCreatedWith InitializeWebGPU
+      , E.onCreatedWith (InitializeWebGPU (selectedExample model))
+      , E.onBeforeDestroyedWith DestroyWebGPU
       ]
       []
     ]
+  ]
+-----------------------------------------------------------------------------
+examples :: [Example]
+examples =
+  [ Triangle
+  , Compute
+  ]
+-----------------------------------------------------------------------------
+exampleId :: Example -> MisoString
+exampleId = \case
+  Triangle -> "triangle"
+  Compute -> "compute"
+-----------------------------------------------------------------------------
+exampleLabel :: Example -> MisoString
+exampleLabel = \case
+  Triangle -> "Triangle"
+  Compute -> "Compute"
+-----------------------------------------------------------------------------
+exampleButton :: Example -> Example -> View Model Action
+exampleButton selected example = H.button_
+  [ P.class_ $
+      if selected == example
+        then "example-button example-button--active"
+        else "example-button"
+  , HE.onClick (SelectExample example)
+  ]
+  [ text (exampleLabel example)
   ]
 -----------------------------------------------------------------------------
 sheet :: StyleSheet
@@ -90,6 +151,27 @@ sheet =
   , CSS.selector_ ".playground-title"
     [ CSS.fontSize (CSS.rem 1.25)
     , CSS.margin "0"
+    ]
+  , CSS.selector_ ".playground-header"
+    [ CSS.display "flex"
+    , CSS.alignItems "center"
+    , CSS.gap (CSS.rem 1)
+    ]
+  , CSS.selector_ ".example-list"
+    [ CSS.display "flex"
+    , CSS.gap (CSS.rem 0.5)
+    ]
+  , CSS.selector_ ".example-button"
+    [ CSS.padding "0.35rem 0.65rem"
+    , CSS.border "1px solid var(--border)"
+    , CSS.borderRadius (CSS.rem 0.25)
+    , CSS.backgroundColor (CSS.var "surface")
+    , CSS.color (CSS.var "text-color")
+    , CSS.cursor "pointer"
+    ]
+  , CSS.selector_ ".example-button--active"
+    [ CSS.borderColor $ CSS.var "#60a5fa"
+    , CSS.backgroundColor $ CSS.var "#1e3a5f"
     ]
   , CSS.selector_ ".webgpu-viewport"
     [ CSS.flex "1"

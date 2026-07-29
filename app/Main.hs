@@ -17,13 +17,10 @@ import           Miso.CSS (StyleSheet)
 data Example
   = Triangle
   | Compute
-  deriving (Eq)
------------------------------------------------------------------------------
-newtype Model = Model
-  { selectedExample :: Example
-  }
-  deriving (Eq)
------------------------------------------------------------------------------
+  deriving (Eq, Show, Bounded, Enum)
+
+type Model = Example
+
 data Action
   = SelectExample Example
   | InitializeWebGPU Example DOMRef
@@ -42,30 +39,27 @@ main = reload defaultEvents app
 #else
 main = startApp defaultEvents app
 #endif
------------------------------------------------------------------------------
+
 app :: App Model Action
 app = (component initialModel updateModel viewModel)
   { styles = [ Sheet sheet ]
   }
 -----------------------------------------------------------------------------
 initialModel :: Model
-initialModel = Model
-  { selectedExample = Triangle
-  }
------------------------------------------------------------------------------
+initialModel = Triangle
 
 updateModel :: Action -> Effect parent props Model Action
 updateModel = \case
   SelectExample example ->
-    modify $ \model -> model { selectedExample = example }
+    put example
   InitializeWebGPU example canvas ->
-    io_ $ I.initializeWebGPU (exampleId example) canvas
+    io_ $ I.initializeWebGPU (ms $ show example) canvas
   DestroyWebGPU canvas ->
     io_ $ I.destroyWebGPU canvas
 
 -----------------------------------------------------------------------------
 viewModel :: props -> Model -> View Model Action
-viewModel _ model = H.div_
+viewModel _ example = H.div_
   [ P.class_ "playground" ]
   [ H.header_
     [ P.class_ "playground-header"
@@ -78,8 +72,8 @@ viewModel _ model = H.div_
     , H.nav_
       [ P.class_ "example-list"
       ]
-      [ exampleButton (selectedExample model) example
-      | example <- examples
+      [ exampleButton example otherExample
+      | otherExample <- [minBound .. maxBound] :: [Example]
       ]
     ]
   , H.div_
@@ -87,32 +81,16 @@ viewModel _ model = H.div_
     , P.class_ "webgpu-viewport"
     ]
     [ H.canvas_
-      [ key_ (exampleId (selectedExample model))
+      [ key_ (show example)
       , P.id_ "webgpu-canvas"
       , P.class_ "webgpu-canvas"
-      , E.onCreatedWith (InitializeWebGPU (selectedExample model))
+      , E.onCreatedWith (InitializeWebGPU example)
       , E.onBeforeDestroyedWith DestroyWebGPU
       ]
       []
     ]
   ]
------------------------------------------------------------------------------
-examples :: [Example]
-examples =
-  [ Triangle
-  , Compute
-  ]
------------------------------------------------------------------------------
-exampleId :: Example -> MisoString
-exampleId = \case
-  Triangle -> "triangle"
-  Compute -> "compute"
------------------------------------------------------------------------------
-exampleLabel :: Example -> MisoString
-exampleLabel = \case
-  Triangle -> "Triangle"
-  Compute -> "Compute"
------------------------------------------------------------------------------
+
 exampleButton :: Example -> Example -> View Model Action
 exampleButton selected example = H.button_
   [ P.class_ $
@@ -121,7 +99,7 @@ exampleButton selected example = H.button_
         else "example-button"
   , HE.onClick (SelectExample example)
   ]
-  [ text (exampleLabel example)
+  [ text $ ms $ show example
   ]
 -----------------------------------------------------------------------------
 sheet :: StyleSheet

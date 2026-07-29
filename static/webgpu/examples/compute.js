@@ -1,3 +1,4 @@
+/** @param {HTMLCanvasElement} canvas */
 export async function initialize(canvas) {
   // adapter is required only for device, most webgpu api goes through device
   const adapter = await navigator.gpu?.requestAdapter();
@@ -78,44 +79,13 @@ export async function initialize(canvas) {
 
   resultBuffer.unmap();
 
-  function render() {
-    if (destroyed) {
-      return;
-    }
-
-  }
-
   function destroy() {
     if (destroyed) {
       return;
     }
-
     destroyed = true;
-    context.unconfigure();
     device.destroy();
   }
 
-  return { render, destroy };
-}
-
-function resizeCanvas(canvas, device) {
-  // dpi
-  const pixelRatio = window.devicePixelRatio || 1;
-  const limit = device.limits.maxTextureDimension2D;
-
-  // canvas.client* are real sizes
-  const width = Math.min(
-    limit,
-    Math.max(1, Math.round(canvas.clientWidth * pixelRatio)),
-  );
-
-  const height = Math.min(
-    limit,
-    Math.max(1, Math.round(canvas.clientHeight * pixelRatio)),
-  );
-
-  if (canvas.width !== width || canvas.height !== height) {
-    canvas.width = width;
-    canvas.height = height;
-  }
+  return { destroy };
 }

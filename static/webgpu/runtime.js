@@ -1,63 +1,38 @@
+// @ts-check
+
+/**
+ * @typedef {{
+ *   render: () => void,
+ *   destroy: () => void
+ * }} Renderer
+ */
+
+/** @type {Renderer | null} */
 let activeRenderer = null;
-let activeCanvas = null;
-let pendingCanvas = null;
-let generation = 0;
 
+/**
+ * @param {HTMLCanvasElement} canvas
+ * @param {string} exampleId
+ * @returns {Promise<void>}
+ */
 export async function initialize(canvas, exampleId) {
-  const currentGeneration = ++generation;
-  pendingCanvas = canvas;
-  releaseActiveRenderer();
+  destroy();
 
-  let renderer;
-  try {
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(exampleId)) {
-      throw new Error(`Invalid WebGPU example: ${exampleId}`);
-    }
-
-    const implementation = await import(
-      `./examples/${exampleId}.js?reload=${Date.now()}`
-    );
-    renderer = await implementation.initialize(canvas);
-  } catch (error) {
-    if (currentGeneration === generation) {
-      pendingCanvas = null;
-    }
-    throw error;
-  }
-
-  if (currentGeneration !== generation) {
-    renderer.destroy();
-    return;
-  }
-
-  pendingCanvas = null;
-  activeCanvas = canvas;
-  activeRenderer = renderer;
-  activeRenderer.render();
+  /** @type {{ initialize: (canvas: HTMLCanvasElement) => Promise<Renderer> }} */
+  const implementation = await import(
+    `./examples/${exampleId.toLowerCase()}.js?reload=${Date.now()}`
+  );
+  activeRenderer = await implementation.initialize(canvas);
+  activeRenderer.render?.();
 }
 
+/** @returns {void} */
 export function render() {
-  activeRenderer?.render();
+  activeRenderer?.render?.();
 }
 
-export function destroy(canvas) {
-  if (canvas !== pendingCanvas && canvas !== activeCanvas) {
-    return;
-  }
-
-  generation += 1;
-
-  if (canvas === pendingCanvas) {
-    pendingCanvas = null;
-  }
-
-  if (canvas === activeCanvas) {
-    releaseActiveRenderer();
-  }
-}
-
-function releaseActiveRenderer() {
+/** @returns {void} */
+export function destroy() {
   activeRenderer?.destroy();
   activeRenderer = null;
-  activeCanvas = null;
 }

@@ -1,3 +1,4 @@
+/** @param {HTMLCanvasElement} canvas */
 export async function initialize(canvas) {
   // adapter is required only for device, most webgpu api goes through device
   const adapter = await navigator.gpu?.requestAdapter();
@@ -9,6 +10,7 @@ export async function initialize(canvas) {
 
   // context is the target to draw to - the webgpu pipeline is separated from the target
   const context = canvas.getContext("webgpu");
+
   if (!context) {
     device.destroy();
     throw new Error("Unable to create a WebGPU canvas context");
@@ -104,6 +106,7 @@ export async function initialize(canvas) {
   return { render, destroy };
 }
 
+/** @param {HTMLCanvasElement} canvas @param {GPUDevice} device*/
 function resizeCanvas(canvas, device) {
   // dpi
   const pixelRatio = window.devicePixelRatio || 1;

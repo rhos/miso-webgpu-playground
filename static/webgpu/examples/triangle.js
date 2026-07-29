@@ -16,8 +16,6 @@ export async function initialize(canvas) {
     throw new Error("Unable to create a WebGPU canvas context");
   }
 
-  resizeCanvas(canvas, device);
-
   const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
   // we need to tell our target what will draw to it
   context.configure({
@@ -75,6 +73,10 @@ export async function initialize(canvas) {
 
   let destroyed = false;
 
+  function resize() {
+    return resizeCanvas(canvas, device);
+  }
+
   function render() {
     if (destroyed) {
       return;
@@ -103,10 +105,14 @@ export async function initialize(canvas) {
     device.destroy();
   }
 
-  return { render, destroy };
+  return { resize, render, destroy };
 }
 
-/** @param {HTMLCanvasElement} canvas @param {GPUDevice} device*/
+/**
+ * @param {HTMLCanvasElement} canvas
+ * @param {GPUDevice} device
+ * @returns {boolean}
+ */
 function resizeCanvas(canvas, device) {
   // dpi
   const pixelRatio = window.devicePixelRatio || 1;
@@ -123,8 +129,11 @@ function resizeCanvas(canvas, device) {
     Math.max(1, Math.round(canvas.clientHeight * pixelRatio)),
   );
 
-  if (canvas.width !== width || canvas.height !== height) {
-    canvas.width = width;
-    canvas.height = height;
+  if (canvas.width === width && canvas.height === height) {
+    return false;
   }
+
+  canvas.width = width;
+  canvas.height = height;
+  return true;
 }

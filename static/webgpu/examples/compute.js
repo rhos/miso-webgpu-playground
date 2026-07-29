@@ -17,7 +17,7 @@ export async function initialize(canvas) {
         @builtin(global_invocation_id) id: vec3u
       ){
         let i = id.x;
-        data[i] = data[i] * 2.0;
+        data[i] = data[i] * 4.0;
       }
     `,
   });

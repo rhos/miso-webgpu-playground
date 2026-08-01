@@ -17,6 +17,7 @@ import           Miso.CSS (StyleSheet)
 data Example
   = Triangle
   | Compute
+  | Circle
   deriving (Eq, Show, Bounded, Enum)
 
 type Model = Example
@@ -46,7 +47,7 @@ app = (component initialModel updateModel viewModel)
   }
 -----------------------------------------------------------------------------
 initialModel :: Model
-initialModel = Triangle
+initialModel = Circle
 
 updateModel :: Action -> Effect parent props Model Action
 updateModel = \case
@@ -148,8 +149,8 @@ sheet =
     , CSS.cursor "pointer"
     ]
   , CSS.selector_ ".example-button--active"
-    [ CSS.borderColor $ CSS.var "#60a5fa"
-    , CSS.backgroundColor $ CSS.var "#1e3a5f"
+    [ CSS.borderColor $ CSS.hex "60a5fa"
+    , CSS.backgroundColor $ CSS.hex "1e3a5f"
     ]
   , CSS.selector_ ".webgpu-viewport"
     [ CSS.flex "1"

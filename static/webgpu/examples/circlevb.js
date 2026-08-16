@@ -20,45 +20,68 @@ function createCircleVertices({
   endAngle = Math.PI * 2,
 } = {}) {
   // 2 triangles per subdivision, 3 verts per tri, 2 values (xy) each.
-  const numVertices = numSubdivisions * 3 * 2;
-  const vertexData = new Float32Array(numSubdivisions * 2 * 3 * 2);
+  const numVertices = (numSubdivisions + 1) * 2;
+  const vertexData = new Float32Array(numVertices * (2 + 1));
+  const colorData = new Uint8Array(vertexData.buffer);
 
   let offset = 0;
-  const addVertex = (/** @type {number} */ x, /** @type {number} */ y) => {
+  let colorOffset = 8;
+  const addVertex = (x,y,r,g,b) => {
     vertexData[offset++] = x;
     vertexData[offset++] = y;
+    offset += 1;
+    colorData[colorOffset++] = r * 255;
+    colorData[colorOffset++] = g * 255;
+    colorData[colorOffset++] = b * 255;
+    colorOffset += 9;
   };
 
+  const innerColor = [1, 1, 1];
+  const outerColor = [0.1, 0.1, 0.1];
   // 2 triangles per subdivision
   //
-  // 0--1 4
-  // | / /|
-  // |/ / |
-  // 2 3--5
-  const angleStep = (endAngle - startAngle) / numSubdivisions
-  for (let i = 0; i < numSubdivisions; ++i) {
-    const angle1 = startAngle + (i + 0) * angleStep;
-    const angle2 = angle1 + angleStep;
+  // 0  2  4  6  8 ...
+  //
+  // 1  3  5  7  9 ...
+  for (let i = 0; i <= numSubdivisions; ++i) {
+    const angle = startAngle + (i + 0) * (endAngle - startAngle) / numSubdivisions;
 
-    const c1 = Math.cos(angle1);
-    const s1 = Math.sin(angle1);
-    const c2 = Math.cos(angle2);
-    const s2 = Math.sin(angle2);
+    const c1 = Math.cos(angle);
+    const s1 = Math.sin(angle);
+
+    addVertex(c1 * radius, s1 * radius, ...outerColor);
+    addVertex(c1 * innerRadius, s1 * innerRadius, ...innerColor);
+  }
+
+  const indexData = new Uint32Array(numSubdivisions * 6);
+  let ndx = 0;
+
+  // 1st tri  2nd tri  3rd tri  4th tri
+  // 0 1 2    2 1 3    2 3 4    4 3 5
+  //
+  // 0--2        2     2--4        4  .....
+  // | /        /|     | /        /|
+  // |/        / |     |/        / |
+  // 1        1--3     3        3--5  .....
+  for (let i = 0; i < numSubdivisions; ++i) {
+    const ndxOffset = i * 2;
 
     // first triangle
-    addVertex(c1 * radius, s1 * radius);
-    addVertex(c2 * radius, s2 * radius);
-    addVertex(c1 * innerRadius, s1 * innerRadius);
+    indexData[ndx++] = ndxOffset;
+    indexData[ndx++] = ndxOffset + 1;
+    indexData[ndx++] = ndxOffset + 2;
 
     // second triangle
-    addVertex(c1 * innerRadius, s1 * innerRadius);
-    addVertex(c2 * radius, s2 * radius);
-    addVertex(c2 * innerRadius, s2 * innerRadius);
+    indexData[ndx++] = ndxOffset + 2;
+    indexData[ndx++] = ndxOffset + 1;
+    indexData[ndx++] = ndxOffset + 3;
   }
 
   return {
     vertexData,
-    numVertices,
+    indexData,
+
+    numVertices: indexData.length,
   };
 }
 
@@ -100,38 +123,26 @@ export async function initialize(canvas) {
       @location(0) color: vec4f
     };
 
-    struct OurStruct
-    {
-      color: vec4f,
-      offset: vec2f
-    };
-
-    struct OtherStruct
-    {
-      scale: vec2f,
-    };
-
     struct Vertex
     {
-      position: vec2f
+      @location(0) position: vec2f,
+      @location(1) color: vec4f,
+      @location(2) offset: vec2f,
+      @location(3) scale: vec2f,
+      @location(4) perVertexColor: vec3f,
     };
 
 
-    @group(0) @binding(0) var<storage, read> ourStructs: array<OurStruct>;
-    @group(0) @binding(1) var<storage, read> otherStructs: array<OtherStruct>;
-    @group(0) @binding(2) var<storage, read> pos: array<Vertex>;
-
     @vertex fn vs(
-      @builtin(vertex_index) vertexIndex : u32,
-      @builtin(instance_index) instanceIndex : u32
-    ) -> OurVertexShaderOutput
+      vert: Vertex) -> OurVertexShaderOutput
     {
-      let otherStruct = otherStructs[instanceIndex];
-      let ourStruct = ourStructs[instanceIndex];
-
       var vsOutput: OurVertexShaderOutput;
-      vsOutput.position = vec4f(pos[vertexIndex].position * otherStruct.scale + ourStruct.offset, 0.0, 1.0);
-      vsOutput.color = ourStruct.color;
+      vsOutput.position = vec4f(
+        vert.position * vert.scale + vert.offset,
+        0.0,
+        1.0);
+      vsOutput.color = vert.color * vec4f(vert.perVertexColor, 1);
+      // vsOutput.color = vec4f(vert.perVertexColor, 1);
       return vsOutput;
     }
 
@@ -139,12 +150,7 @@ export async function initialize(canvas) {
       vsOut : OurVertexShaderOutput
     ) -> @location(0) vec4f
     {
-      let red = vec4f(1, 0, 0, 1);
-      let cyan = vec4f(0, 1, 1, 1);
-
-      let grid = vec2u(vsOut.position.xy) / 8;
-      let checker = (grid.x + grid.y) % 2 == 1;
-      return select(vsOut.color, red, checker);
+      return vsOut.color;
     }
     `,
   });
@@ -154,7 +160,31 @@ export async function initialize(canvas) {
     layout: 'auto',
     vertex: {
       // entryPoint: 'vs',
-      module : shaderModule,
+      module: shaderModule,
+      buffers: [
+        {
+          arrayStride: 2*4 + 4,
+          attributes: [
+            { shaderLocation: 0, offset: 0, format: 'float32x2' },
+            {shaderLocation: 4, offset: 2*4, format: 'unorm8x4'}
+          ]
+        },
+        {
+          arrayStride: 4 + 2*4,
+          stepMode: 'instance',
+          attributes: [
+            {shaderLocation: 1, offset: 0, format: 'unorm8x4' },
+            {shaderLocation: 2, offset: 4, format: 'float32x2'}
+          ]
+        },
+        {
+          arrayStride: 2 * 4, // 2 floats
+          stepMode: 'instance',
+          attributes: [
+            {shaderLocation: 3, offset: 0, format: 'float32x2' },
+          ]
+        },
+      ]
     },
     fragment: {
       // entryPoint: 'fs',
@@ -164,15 +194,13 @@ export async function initialize(canvas) {
   });
 
   const staticItemSize =
-    4 * 4 + // 4 floats, each float 4 bytes
-    2 * 4 +
-    2 * 4; // padding as vec4f requires 16 aligment
-
+    4 +
+    2 * 4;
   const dynamicItemSize =
     2 * 4;
 
   const kColorOffset = 0;
-  const kOffsetOffset = 4;
+  const kOffsetOffset = 1;
 
   const kScaleOffset = 0;
 
@@ -181,57 +209,55 @@ export async function initialize(canvas) {
   const staticBufferSize = staticItemSize * kNumObjects;
   const dynamicBufferSize = dynamicItemSize * kNumObjects;
 
-  const staticStorageBuffer = device.createBuffer({
-    label: "sb",
-    size: staticBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-  });
-
-  const dynamicStorageBuffer = device.createBuffer({
-    label: "db",
-    size: dynamicBufferSize,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-  });
-
-  const { vertexData, numVertices } = createCircleVertices({
+  const { vertexData, indexData, numVertices } = createCircleVertices({
     radius: 0.5,
     innerRadius: 0.25
   });
-  const vertexStorageBuffer = device.createBuffer({
+  const vertexBuffer = device.createBuffer({
     label: "vb",
     size: vertexData.byteLength,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
   });
-   device.queue.writeBuffer(vertexStorageBuffer, 0, vertexData);
+  const indexBuffer = device.createBuffer({
+    label: 'index buffer',
+    size: indexData.byteLength,
+    usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(indexBuffer, 0, indexData);
+  device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+
+  const staticVertexBuffer = device.createBuffer({
+    label: "sb",
+    size: staticBufferSize,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  });
+
+  const dynamicVertexBuffer = device.createBuffer({
+    label: "db",
+    size: dynamicBufferSize,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  });
 
   /** @type {{ scale: number; }[]} */
   const objectInfos = [];
 
   {
-    const staticValues = new Float32Array(staticBufferSize / 4);
+    const staticValuesU8 = new Uint8Array(staticBufferSize);
+    const staticValuesF32 = new Float32Array(staticValuesU8.buffer);
     for (let i = 0; i < kNumObjects; ++i)
     {
-      const staticOffset = i * (staticItemSize / 4)
-      staticValues.set([rand(), rand(), rand(), 1], staticOffset + kColorOffset);
-      staticValues.set([rand(-0.9, 0.9), rand(-0.9, 0.9)], staticOffset + kOffsetOffset);
+      const staticOffsetU8 = i * staticItemSize
+      const staticOffsetF32 = staticOffsetU8 / 4
+      staticValuesU8.set([rand()*255, rand()*255, rand()*255, 255], staticOffsetU8 + kColorOffset);
+      staticValuesF32.set([rand(-0.9, 0.9), rand(-0.9, 0.9)], staticOffsetF32 + kOffsetOffset);
       objectInfos.push({
         scale: rand(0.2, 0.5)
       });
     }
-    device.queue.writeBuffer(staticStorageBuffer, 0, staticValues);
+    device.queue.writeBuffer(staticVertexBuffer, 0, staticValuesF32);
   }
 
   const dynamicValues = new Float32Array(dynamicBufferSize / 4);
-  const bindGroup = device.createBindGroup({
-    label: "bg",
-    layout: pipeline.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: staticStorageBuffer },
-      { binding: 1, resource: dynamicStorageBuffer },
-      { binding: 2, resource: vertexStorageBuffer },
-    ]
-  })
-
 
   /** @type {GPURenderPassColorAttachment} */
   const colorAttachment = {
@@ -265,15 +291,18 @@ export async function initialize(canvas) {
     const encoder = device.createCommandEncoder({ label: "circle encoder" });
     const pass = encoder.beginRenderPass(renderPassDescriptor);
     pass.setPipeline(pipeline);
+    pass.setVertexBuffer(0, vertexBuffer);
+    pass.setVertexBuffer(1, staticVertexBuffer);
+    pass.setVertexBuffer(2, dynamicVertexBuffer);
+    pass.setIndexBuffer(indexBuffer, 'uint32');
 
     objectInfos.forEach(({ scale }, ndx) => {
       const offset = ndx * (dynamicItemSize / 4);
       dynamicValues.set([scale / aspect, scale], offset + kScaleOffset);
     });
-    device.queue.writeBuffer(dynamicStorageBuffer, 0, dynamicValues);
+    device.queue.writeBuffer(dynamicVertexBuffer, 0, dynamicValues);
 
-    pass.setBindGroup(0, bindGroup);
-    pass.draw(numVertices, kNumObjects);
+    pass.drawIndexed(numVertices, kNumObjects);
 
     pass.end();
 

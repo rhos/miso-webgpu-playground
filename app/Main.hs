@@ -18,6 +18,12 @@ data Example
   = Triangle
   | Compute
   | Circle
+  | CircleVB
+  | Texture
+  | TextureMipMap
+  | LoadingImages
+  | LoadingCanvas
+  | CubeMap
   deriving (Eq, Show, Bounded, Enum)
 
 type Model = Example
@@ -37,6 +43,7 @@ foreign export javascript "hs_start" main :: IO ()
 main :: IO ()
 #ifdef INTERACTIVE
 main = reload defaultEvents app
+-- main = live defaultEvents app
 #else
 main = startApp defaultEvents app
 #endif
@@ -47,7 +54,7 @@ app = (component initialModel updateModel viewModel)
   }
 -----------------------------------------------------------------------------
 initialModel :: Model
-initialModel = Circle
+initialModel = maxBound
 
 updateModel :: Action -> Effect parent props Model Action
 updateModel = \case

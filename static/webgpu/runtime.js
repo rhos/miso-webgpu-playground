@@ -4,6 +4,7 @@
  * @typedef {{
  *   resize?: () => boolean,
  *   render?: () => void,
+ *   changeSettings?: (settings: Record<string, unknown>) => void,
  *   destroy: () => void
  * }} Renderer
  */
@@ -42,6 +43,14 @@ export async function initialize(canvas, exampleId) {
 /** @returns {void} */
 export function render() {
   activeRenderer?.render?.();
+}
+
+/**
+ * @param {Record<string, unknown>} settings
+ * @returns {void}
+ */
+export function changeSettings(settings) {
+  activeRenderer?.changeSettings?.(settings);
 }
 
 /** @returns {void} */

@@ -5,6 +5,7 @@
 -----------------------------------------------------------------------------
 module Main where
 -----------------------------------------------------------------------------
+import qualified Examples.TextureSettings as TextureSettings
 import qualified Interop as I
 import           Miso
 import           Miso.Html.Element as H
@@ -51,11 +52,15 @@ main = startApp defaultEvents app
 
 app :: App Model Action
 app = (component initialModel updateModel viewModel)
-  { styles = [ Sheet sheet ]
+  { styles =
+    [ Sheet sheet
+    , Sheet TextureSettings.sheet
+    ]
   }
 -----------------------------------------------------------------------------
 initialModel :: Model
-initialModel = maxBound
+-- initialModel = maxBound
+initialModel = Texture
 
 updateModel :: Action -> Effect parent props Model Action
 updateModel = \case
@@ -97,8 +102,16 @@ viewModel _ example = H.div_
       , E.onBeforeDestroyedWith DestroyWebGPU
       ]
       []
+    , exampleAdditions example
     ]
   ]
+
+exampleAdditions :: Example -> View Model Action
+exampleAdditions = \case
+  Texture ->
+    "texture-settings" +> TextureSettings.component
+  _ ->
+    fragment []
 
 exampleButton :: Example -> Example -> View Model Action
 exampleButton selected example = H.button_
@@ -166,6 +179,7 @@ sheet =
     , CSS.minHeight "0"
     , CSS.width "100%"
     , CSS.overflow "hidden"
+    , "position" =: "relative"
     , CSS.backgroundColor (CSS.var "surface")
     , CSS.border "1px solid var(--border)"
     , CSS.borderRadius (CSS.rem 0.25)

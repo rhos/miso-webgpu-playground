@@ -315,7 +315,14 @@ export async function initialize(canvas) {
     device.destroy();
   }
 
-  return { resize, render, destroy };
+  /**
+   * @param {Partial<typeof settings>} newSettings
+   */
+  function changeSettings(newSettings) {
+    Object.assign(settings, newSettings);
+  }
+
+  return { resize, render, changeSettings, destroy };
 }
 
 /**

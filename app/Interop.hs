@@ -25,6 +25,26 @@ renderWebGPU =
       .catch(error => console.error('WebGPU render failed', error));
   |]
 
+changeTextureSettings
+  :: MisoString
+  -> MisoString
+  -> MisoString
+  -> MisoString
+  -> Double
+  -> IO ()
+changeTextureSettings addressModeU addressModeV magFilter minFilter scale =
+  [js|
+    import('/assets/static/webgpu/runtime.js?reload=' + ${runtimeReload})
+      .then(runtime => runtime.changeSettings({
+        addressModeU: ${addressModeU},
+        addressModeV: ${addressModeV},
+        magFilter: ${magFilter},
+        minFilter: ${minFilter},
+        scale: ${scale}
+      }))
+      .catch(error => console.error('WebGPU settings update failed', error));
+  |]
+
 destroyWebGPU :: DOMRef -> IO ()
 destroyWebGPU canvas =
   [js|

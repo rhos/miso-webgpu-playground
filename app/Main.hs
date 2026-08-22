@@ -24,6 +24,7 @@ data Example
   | LoadingImages
   | LoadingCanvas
   | CubeMap
+  | Immediates
   deriving (Eq, Show, Bounded, Enum)
 
 type Model = Example
@@ -145,6 +146,7 @@ sheet =
     ]
   , CSS.selector_ ".example-list"
     [ CSS.display "flex"
+    , CSS.flexWrap "wrap"
     , CSS.gap (CSS.rem 0.5)
     ]
   , CSS.selector_ ".example-button"

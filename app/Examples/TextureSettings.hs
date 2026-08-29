@@ -128,9 +128,7 @@ addressModeControl label mode toAction = selectControl
   label
   (addressModeValue mode)
   (toAction . addressModeFromValue)
-  [ ("clamp-to-edge", "clamp-to-edge")
-  , ("repeat", "repeat")
-  ]
+  (addressModeValue <$> [ClampToEdge, Repeat])
 
 filterModeControl
   :: MisoString
@@ -141,15 +139,13 @@ filterModeControl label mode toAction = selectControl
   label
   (filterModeValue mode)
   (toAction . filterModeFromValue)
-  [ ("nearest", "nearest")
-  , ("linear", "linear")
-  ]
+  (filterModeValue <$> [Nearest, Linear])
 
 selectControl
   :: MisoString
   -> MisoString
   -> (MisoString -> Action)
-  -> [(MisoString, MisoString)]
+  -> [MisoString]
   -> View Model Action
 selectControl label selectedValue onChange options = H.label_
   [ P.class_ "texture-setting"
@@ -163,9 +159,9 @@ selectControl label selectedValue onChange options = H.label_
     [ H.option_
       [ P.value_ value
       ]
-      [ text optionLabel
+      [ text value
       ]
-    | (value, optionLabel) <- options
+    | value <- options
     ]
   ]
 

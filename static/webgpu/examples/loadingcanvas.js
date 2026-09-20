@@ -1,4 +1,3 @@
-// @ts-check
 import { mat4 } from 'https://webgpufundamentals.org/3rdparty/wgpu-matrix.module.js';
 
 function createAnimatedCanvas()

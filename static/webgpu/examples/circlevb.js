@@ -1,5 +1,3 @@
-// @ts-check
-
 /** @type {(min?: number, max?: number) => number} */
 const rand = (min, max) => {
   if (min === undefined) {
@@ -89,7 +87,9 @@ function createCircleVertices({
 export async function initialize(canvas) {
   // adapter is required only for device, most webgpu api goes through device
   const adapter = await navigator.gpu?.requestAdapter();
-  const maybeDevice = await adapter?.requestDevice();
+  const maybeDevice = await adapter?.requestDevice({
+    requiredFeatures: ['timestamp-query']
+  });
 
   if (!maybeDevice) {
     throw new Error("WebGPU is not supported");
@@ -166,22 +166,22 @@ export async function initialize(canvas) {
           arrayStride: 2*4 + 4,
           attributes: [
             { shaderLocation: 0, offset: 0, format: 'float32x2' },
-            {shaderLocation: 4, offset: 2*4, format: 'unorm8x4'}
+            { shaderLocation: 4, offset: 2*4, format: 'unorm8x4'}
           ]
         },
         {
-          arrayStride: 4 + 2*4,
+          arrayStride: 4,
           stepMode: 'instance',
           attributes: [
             {shaderLocation: 1, offset: 0, format: 'unorm8x4' },
-            {shaderLocation: 2, offset: 4, format: 'float32x2'}
           ]
         },
         {
-          arrayStride: 2 * 4, // 2 floats
+          arrayStride: 4 * 4, // 4 floats
           stepMode: 'instance',
           attributes: [
-            {shaderLocation: 3, offset: 0, format: 'float32x2' },
+            {shaderLocation: 2, offset: 0, format: 'float32x2'},
+            { shaderLocation: 3, offset: 8, format: 'float32x2' },
           ]
         },
       ]
@@ -194,17 +194,16 @@ export async function initialize(canvas) {
   });
 
   const staticItemSize =
-    4 +
-    2 * 4;
+    4;
   const dynamicItemSize =
-    2 * 4;
+    2 * 4 + 2 * 4;;
 
   const kColorOffset = 0;
-  const kOffsetOffset = 1;
 
-  const kScaleOffset = 0;
+  const kOffsetOffset = 0;
+  const kScaleOffset = 2;
 
-  const kNumObjects = 100;
+  const kNumObjects = 1000;
 
   const staticBufferSize = staticItemSize * kNumObjects;
   const dynamicBufferSize = dynamicItemSize * kNumObjects;
@@ -238,23 +237,25 @@ export async function initialize(canvas) {
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
   });
 
-  /** @type {{ scale: number; }[]} */
+  /**
+   * @type {{ scale: number; offset: number[]; velocity: number[]; }[]}
+   */
   const objectInfos = [];
 
   {
     const staticValuesU8 = new Uint8Array(staticBufferSize);
-    const staticValuesF32 = new Float32Array(staticValuesU8.buffer);
     for (let i = 0; i < kNumObjects; ++i)
     {
       const staticOffsetU8 = i * staticItemSize
       const staticOffsetF32 = staticOffsetU8 / 4
       staticValuesU8.set([rand()*255, rand()*255, rand()*255, 255], staticOffsetU8 + kColorOffset);
-      staticValuesF32.set([rand(-0.9, 0.9), rand(-0.9, 0.9)], staticOffsetF32 + kOffsetOffset);
       objectInfos.push({
-        scale: rand(0.2, 0.5)
+        scale: rand(0.2, 0.5),
+        offset: [rand(-0.9, 0.9), rand(-0.9, 0.9)],
+        velocity: [rand(-0.1, 0.1), rand(-0.1, 0.1)],
       });
     }
-    device.queue.writeBuffer(staticVertexBuffer, 0, staticValuesF32);
+    device.queue.writeBuffer(staticVertexBuffer, 0, staticValuesU8);
   }
 
   const dynamicValues = new Float32Array(dynamicBufferSize / 4);
@@ -267,10 +268,28 @@ export async function initialize(canvas) {
     storeOp: "store",
   };
 
+  const querySet = device.createQuerySet({
+     type: 'timestamp',
+     count: 2,
+  });
+  const resolveBuffer = device.createBuffer({
+    size: querySet.count * 8,
+    usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+  });
+  const resultBuffer = device.createBuffer({
+    size: resolveBuffer.size,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  });
+
   /** @type {GPURenderPassDescriptor} */
   const renderPassDescriptor = {
     label: "circle render pass",
-    colorAttachments: [ colorAttachment ],
+    colorAttachments: [colorAttachment],
+    timestampWrites: {
+      querySet,
+      beginningOfPassWriteIndex: 0,
+      endOfPassWriteIndex: 1
+    }
   };
 
   let destroyed = false;
@@ -279,10 +298,25 @@ export async function initialize(canvas) {
     return resizeCanvas(canvas, device);
   }
 
-  function render() {
+  const euclideanModulo = (x, a) => x - a * Math.floor(x / a);
+  let then = 0;
+
+  let drawnNObjects = 10;
+
+  let gpuTime = 0;
+
+  const infoElem = document.getElementById('circle-vb-output');
+
+
+  function render(now) {
     if (destroyed) {
       return;
     }
+    now *= 0.001;  // convert to seconds
+    const deltaTime = now - then;
+    then = now;
+
+    const startTime = performance.now();
 
     const aspect = canvas.width / canvas.height;
 
@@ -296,19 +330,48 @@ export async function initialize(canvas) {
     pass.setVertexBuffer(2, dynamicVertexBuffer);
     pass.setIndexBuffer(indexBuffer, 'uint32');
 
-    objectInfos.forEach(({ scale }, ndx) => {
-      const offset = ndx * (dynamicItemSize / 4);
-      dynamicValues.set([scale / aspect, scale], offset + kScaleOffset);
-    });
-    device.queue.writeBuffer(dynamicVertexBuffer, 0, dynamicValues);
+    for (let ndx = 0; ndx < drawnNObjects; ++ndx) {
+      const { scale, offset, velocity } = objectInfos[ndx];
+      // -1.5 to 1.5
+      offset[0] = euclideanModulo(offset[0] + velocity[0] * deltaTime + 1.5, 3) - 1.5;
+      offset[1] = euclideanModulo(offset[1] + velocity[1] * deltaTime + 1.5, 3) - 1.5;
 
-    pass.drawIndexed(numVertices, kNumObjects);
+      const off = ndx * (dynamicItemSize / 4);
+      dynamicValues.set(offset, off + kOffsetOffset);
+      dynamicValues.set([scale / aspect, scale], off + kScaleOffset);
+    };
+    device.queue.writeBuffer(dynamicVertexBuffer, 0, dynamicValues, 0, drawnNObjects * dynamicItemSize / 4);
+
+    pass.drawIndexed(numVertices, drawnNObjects);
 
     pass.end();
+    encoder.resolveQuerySet(querySet, 0, querySet.count, resolveBuffer, 0);
+
+    if (resultBuffer.mapState === 'unmapped')
+      encoder.copyBufferToBuffer(resolveBuffer, 0, resultBuffer, 0, resultBuffer.size);
 
     const commandBuffer = encoder.finish();
     device.queue.submit([commandBuffer]);
+
+    if (resultBuffer.mapState === 'unmapped') {
+      resultBuffer.mapAsync(GPUMapMode.READ).then(() => {
+        const times = new BigUint64Array(resultBuffer.getMappedRange());
+        gpuTime = Number(times[1] - times[0]);
+        resultBuffer.unmap();
+      });
+    }
+
+    const jsTime = performance.now() - startTime;
+    infoElem.textContent = `\
+fps: ${(1 / deltaTime).toFixed(1)}
+js: ${jsTime.toFixed(1)}ms
+gpu: ${(gpuTime / 1000).toFixed(1)}µs
+`;
+
+    requestAnimationFrame(render);
   }
+
+  requestAnimationFrame(render);
 
   function destroy() {
     if (destroyed) {
@@ -320,7 +383,7 @@ export async function initialize(canvas) {
     device.destroy();
   }
 
-  return { resize, render, destroy };
+  return { resize, destroy };
 }
 
 /**

@@ -35,6 +35,7 @@ executable app
   main-is:
     Main.hs
   other-modules:
+    Examples.CircleVBSettings
     Examples.TextureSettings
     Interop
   build-depends:

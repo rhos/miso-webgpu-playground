@@ -6,6 +6,7 @@
 module Main where
 -----------------------------------------------------------------------------
 import qualified Examples.TextureSettings as TextureSettings
+import qualified Examples.CircleVBSettings as CircleVBSettings
 import qualified Interop as I
 import           Miso
 import           Miso.Html.Element as H
@@ -44,8 +45,8 @@ foreign export javascript "hs_start" main :: IO ()
 -----------------------------------------------------------------------------
 main :: IO ()
 #ifdef INTERACTIVE
-main = reload defaultEvents app
--- main = live defaultEvents app
+-- main = reload defaultEvents app
+main = live defaultEvents app
 #else
 main = startApp defaultEvents app
 #endif
@@ -55,6 +56,7 @@ app = (component initialModel updateModel viewModel)
   { styles =
     [ Sheet sheet
     , Sheet TextureSettings.sheet
+    , Sheet CircleVBSettings.sheet
     ]
   }
 -----------------------------------------------------------------------------
@@ -110,6 +112,8 @@ exampleAdditions :: Example -> View Model Action
 exampleAdditions = \case
   Texture ->
     "texture-settings" +> TextureSettings.component
+  CircleVB ->
+    "circle-vb-settings" +> CircleVBSettings.component
   _ ->
     fragment []
 

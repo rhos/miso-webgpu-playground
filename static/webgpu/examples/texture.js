@@ -1,5 +1,3 @@
-// @ts-check
-
 const lerp = (a, b, t) => a + (b - a) * t;
 const mix = (a, b, t) => a.map((v, i) => lerp(v, b[i], t));
 const bilinearFilter = (tl, tr, bl, br, t1, t2) => {

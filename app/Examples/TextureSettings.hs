@@ -58,35 +58,35 @@ initialModel = Model
 updateModel :: Action -> Effect parent () Model Action
 updateModel = \case
   SetAddressModeU mode ->
-    applyModelChange $ \model -> model { addressModeU = mode }
+    applyModelChange $ \amodel -> amodel { addressModeU = mode }
   SetAddressModeV mode ->
-    applyModelChange $ \model -> model { addressModeV = mode }
+    applyModelChange $ \amodel -> amodel { addressModeV = mode }
   SetMagFilter mode ->
-    applyModelChange $ \model -> model { magFilter = mode }
+    applyModelChange $ \amodel -> amodel { magFilter = mode }
   SetMinFilter mode ->
-    applyModelChange $ \model -> model { minFilter = mode }
+    applyModelChange $ \amodel -> amodel { minFilter = mode }
   SetScale newScale ->
-    applyModelChange $ \model -> model { scale = newScale }
+    applyModelChange $ \amodel -> amodel { scale = newScale }
 
 applyModelChange
   :: (Model -> Model)
   -> Effect parent () Model Action
 applyModelChange change = do
-  model <- get
-  let updatedModel = change model
+  amodel <- get
+  let updatedModel = change amodel
   put updatedModel
   io_ $ sendSettings updatedModel
 
 sendSettings :: Model -> IO ()
-sendSettings model = I.changeTextureSettings
-  (addressModeValue $ addressModeU model)
-  (addressModeValue $ addressModeV model)
-  (filterModeValue $ magFilter model)
-  (filterModeValue $ minFilter model)
-  (scale model)
+sendSettings amodel = I.changeTextureSettings
+  (addressModeValue $ addressModeU amodel)
+  (addressModeValue $ addressModeV amodel)
+  (filterModeValue $ magFilter amodel)
+  (filterModeValue $ minFilter amodel)
+  (scale amodel)
 
 viewModel :: () -> Model -> View Model Action
-viewModel _ model = H.div_
+viewModel _ amodel = H.div_
   [ P.class_ "texture-settings"
   ]
   [ H.h2_
@@ -94,10 +94,10 @@ viewModel _ model = H.div_
     ]
     [ "Texture settings"
     ]
-  , addressModeControl "Address mode U" (addressModeU model) SetAddressModeU
-  , addressModeControl "Address mode V" (addressModeV model) SetAddressModeV
-  , filterModeControl "Mag filter" (magFilter model) SetMagFilter
-  , filterModeControl "Min filter" (minFilter model) SetMinFilter
+  , addressModeControl "Address mode U" (addressModeU amodel) SetAddressModeU
+  , addressModeControl "Address mode V" (addressModeV amodel) SetAddressModeV
+  , filterModeControl "Mag filter" (magFilter amodel) SetMagFilter
+  , filterModeControl "Min filter" (minFilter amodel) SetMinFilter
   , H.label_
     [ P.class_ "texture-setting"
     ]
@@ -105,7 +105,7 @@ viewModel _ model = H.div_
     , H.output_
       [ P.class_ "texture-setting-value"
       ]
-      [ text $ ms $ scale model
+      [ text $ ms $ scale amodel
       ]
     , H.input_
       [ P.class_ "texture-scale-input"
@@ -113,7 +113,7 @@ viewModel _ model = H.div_
       , P.min_ "0.5"
       , P.max_ "6"
       , P.step_ "0.1"
-      , P.value_ $ ms $ scale model
+      , P.value_ $ ms $ scale amodel
       , HE.onInput (SetScale . fromMisoString)
       ]
     ]

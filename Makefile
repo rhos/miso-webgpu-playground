@@ -37,7 +37,7 @@ optim:
 	wasm-tools strip -o public/app.wasm public/app.wasm
 
 serve:
-	http-server public
+	http-server public -c-1
 
 clean:
 	rm -rf dist-newstyle public
